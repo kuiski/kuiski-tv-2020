@@ -1,3 +1,6 @@
+import * as path from 'path'
+import * as fs from 'fs'
+
 export default {
   mode: 'spa',
   /*
@@ -23,11 +26,15 @@ export default {
   /*
    ** Global CSS
    */
-  css: ['element-ui/lib/theme-chalk/index.css'],
+  css: ['element-ui/lib/theme-chalk/index.css', 'modern-css-reset'],
   /*
    ** Plugins to load before mounting the App
    */
-  plugins: ['@/plugins/element-ui'],
+  plugins: [
+    '@/plugins/element-ui',
+    '@/plugins/composition-api',
+    '@/plugins/firebase'
+  ],
   /*
    ** Nuxt.js dev-modules
    */
@@ -55,11 +62,11 @@ export default {
    ** Build configuration
    */
   build: {
-    transpile: [/^element-ui/],
+    transpile: [/^element-ui/]
     /*
      ** You can extend webpack config here
      */
-    extend(config: any, ctx: any) { }
+    // extend(config: any, ctx: any) { }
   },
 
   /*
@@ -68,5 +75,16 @@ export default {
   typescript: {
     typeCheck: true,
     ignoreNotFoundWarnings: true
+  },
+
+  /*
+   ** Nuxt Server configuration
+   */
+  server: {
+    host: '0.0.0.0',
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, 'server-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, 'server.pem'))
+    }
   }
 }
