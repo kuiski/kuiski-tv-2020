@@ -8,6 +8,7 @@
 .telop {
   font-size: 48px;
   line-height: 0;
+  margin-top: 20px;
 }
 
 .tag {
@@ -22,7 +23,8 @@
 
 .message {
   line-height: 1em;
-  padding: 0.1em;
+  padding: 0.5em;
+  padding-top: 0.6em;
   height: 75px;
   min-width: 400px;
   border-left: 10px solid #cf4c4e;
@@ -30,7 +32,7 @@
   display: inline-block;
   vertical-align: middle;
   font-size: 30px;
-  text-align: center;
+  text-align: left;
   background-color: #fff;
 }
 </style>

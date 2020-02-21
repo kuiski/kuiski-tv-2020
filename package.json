@@ -9,7 +9,8 @@
     "build": "nuxt-ts build",
     "start": "nuxt-ts start",
     "generate": "nuxt-ts generate",
-    "lint": "eslint --ext .ts,.js,.vue --ignore-path .gitignore ."
+    "lint": "eslint --ext .ts,.js,.vue --ignore-path .gitignore .",
+    "deploy": "firebase deploy --only hosting:kuiski-tv"
   },
   "dependencies": {
     "@nuxt/typescript-runtime": "^0.3.8",
@@ -36,6 +37,7 @@
     "eslint-plugin-nuxt": ">=0.4.2",
     "eslint-plugin-prettier": "^3.0.1",
     "prettier": "^1.16.4",
+    "typescript-tslint-plugin": "^0.5.5",
     "vue-property-decorator": "^8.4.0"
   }
 }

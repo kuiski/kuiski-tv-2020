@@ -27,8 +27,12 @@
     "types": [
       "@types/node",
       "@nuxt/types"
-    ]
+    ],
+    "plugins": [{"name": "typescript-tslint-plugin"}]
   },
+  "files": [
+    "ts-shims.d.ts"
+  ],
   "exclude": [
     "node_modules"
   ]

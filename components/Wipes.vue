@@ -3,7 +3,7 @@
     <div v-for="session in sessions" :key="session.peerId" :span="4">
       <slot>
         <div class="wipe">
-          <video autoplay :srcObject.prop="session.stream" />
+          <video autoplay :srcObject.prop="session" class="video" />
         </div>
       </slot>
     </div>
@@ -20,8 +20,8 @@
 }
 
 .wipe {
-  width: 35vh;
-  height: 35vh;
+  width: 20vw;
+  height: 20vw;
   overflow: hidden;
   position: relative;
   border: 1px solid gray;
@@ -32,26 +32,21 @@
   object-fit: cover;
   width: 100%;
   height: 100%;
+  /*transform: scaleX(-1); */
 }
 </style>
 
 <script lang="ts">
-import { createComponent, PropType, watch } from '@vue/composition-api'
-import { StreamSession } from '~/api/useStream'
+import { createComponent, PropType } from '@vue/composition-api'
+// import { StreamSession } from '~/api/useStream'
 
 interface WindowProps {
-  sessions: StreamSession[]
+  sessions: MediaStream[]
 }
 
 export default createComponent<WindowProps>({
   props: {
-    sessions: { type: Array as PropType<StreamSession[]> }
-  },
-  setup(props) {
-    watch(() => {
-      console.log(props.sessions)
-    })
-    return {}
+    sessions: { type: Array as PropType<MediaStream[]> }
   }
 })
 </script>

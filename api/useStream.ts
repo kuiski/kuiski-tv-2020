@@ -1,5 +1,5 @@
 import Peer, { SfuRoom, MeshRoom } from 'skyway-js'
-import { reactive, computed } from '@vue/composition-api'
+import { reactive, watch } from '@vue/composition-api'
 import { getCameraStream } from '~/api/media'
 
 export interface StreamSession {
@@ -7,7 +7,7 @@ export interface StreamSession {
   stream?: MediaStream
 }
 
-export interface Member {
+interface Member {
   peerId: string
 }
 
@@ -15,11 +15,12 @@ export interface StreamStore {
   peer: Peer
   ready: boolean
   localStream?: MediaStream
-  masterSession?: StreamSession
   master?: string
+  alternative?: string // 中継映像(Masterを上書きする)
   room?: SfuRoom | MeshRoom
+  leader?: string
   members: Member[]
-  sessions: StreamSession[]
+  sessions: MediaStream[]
 }
 
 export interface StartCastMessage {
@@ -33,7 +34,8 @@ export interface StopCastMessage {
 
 export interface SyncMessage {
   type: 'sync'
-  master: string
+  leader: string | undefined
+  master: string | undefined
   members: Member[]
 }
 
@@ -43,36 +45,79 @@ export function isCastMessage(data: any): data is CastMessage {
   return 'type' in data
 }
 
-const setLocalStream = (store: StreamStore, localStream: MediaStream) => {
-  store.localStream = localStream
-}
-
-export default function(skywayKey: string, localStream?: MediaStream) {
+export function useStream(
+  skywayKey: string,
+  roomName: string,
+  roomMode: 'mesh' | 'sfu',
+  localStream?: MediaStream
+) {
   const store = reactive<StreamStore>({
     localStream,
     peer: new Peer({ key: skywayKey }),
+    ready: false,
     members: [],
     sessions: [],
-    ready: false
+    master: undefined,
+    alternative: undefined,
+    room: undefined,
+    leader: undefined
   })
 
-  store.peer.on('open', (_peerId) => {
+  watch(() => {
+    console.log(store.sessions)
+  })
+
+  function onCastMessage(data: CastMessage) {
+    console.log(data)
+    if (data.type === 'startCast') {
+      // 放送者がリーダーもやる
+      store.leader = data.master
+      store.master = data.master
+      console.log(store.master)
+    } else if (data.type === 'stopCast') {
+      store.master = undefined
+    } else if (data.type === 'sync') {
+      store.leader = data.leader
+      store.master = data.master
+      store.members = data.members
+    }
+  }
+
+  function sendMessage(msg: CastMessage, local: boolean = true) {
+    if (store.room) store.room.send(msg)
+    if (local) onCastMessage(msg)
+  }
+
+  function sendSyncMessage() {
+    sendMessage(
+      {
+        type: 'sync',
+        leader: store.leader,
+        master: store.master,
+        members: store.members
+      },
+      false
+    )
+  }
+
+  store.peer.on('open', (myPeerId) => {
     store.ready = true
-  })
+    store.room = store.peer.joinRoom<SfuRoom | MeshRoom>(roomName, {
+      mode: roomMode,
+      stream: localStream
+    })
 
-  function joinRoom(roomName: string, roomMode: string) {
-    if (roomMode !== 'sfu' && roomMode !== 'mesh')
-      throw new Error(`Unknown room mode ${roomMode}`)
-
-    if (!store.ready) {
-      throw new Error('You called joinRoom before initialized Peer')
+    if (localStream) {
+      const ms: any = new MediaStream(localStream.getVideoTracks())
+      ms.peerId = store.peer.id
+      store.sessions.push(ms)
     }
 
-    if (store.room) return // already joined
-
-    store.room = store.peer.joinRoom<SfuRoom | MeshRoom>(roomName, {
-      mode: roomMode
+    store.members.push({
+      peerId: myPeerId
     })
+
+    store.leader = myPeerId
 
     store.room.on('data', (data) => {
       if (isCastMessage(data.data)) {
@@ -81,65 +126,59 @@ export default function(skywayKey: string, localStream?: MediaStream) {
     })
 
     store.room.on('peerJoin', (peerId) => {
-      store.sessions.push({
-        peerId
-      })
       store.members.push({
         peerId
       })
 
-      if (store.peer.id === store.master) {
-        sendMessage(
-          { type: 'sync', master: store.master, members: store.members },
-          false
-        )
+      if (store.peer.id === store.leader) {
+        sendSyncMessage()
       }
+    })
+
+    store.room.on('log', (logs) => {
+      logs.forEach((log) => {
+        console.log(JSON.parse(log))
+      })
     })
 
     store.room.on('peerLeave', (peerId) => {
-      store.sessions = store.sessions.filter(
-        (session) => session.peerId !== peerId
-      )
-      store.members = store.members.filter((member) => member.peerId !== peerId)
       if (peerId === store.master) {
         store.master = undefined
       }
+      if (peerId === store.leader) {
+        // リーダーが退出した時はメンバーリストの先頭の人がリーダーになる
+        // 自分がリーダーになった時はメンバーに同期メッセージを送信する(同期ずれで複数がリーダーになった時の対策)
+        store.leader = store.members[0]?.peerId
+        if (store.peer.id === store.leader) sendSyncMessage()
+      }
+
+      store.sessions = store.sessions.filter(
+        (session) => session.peerId !== peerId
+      )
+      // delete store.sessions[peerId]
+      store.members = store.members.filter((member) => member.peerId !== peerId)
     })
 
     store.room.on('stream', (stream) => {
-      console.log('stream')
-
-      store.sessions = store.sessions.map((session) => {
-        if (stream.peerId === session.peerId) {
-          return {
-            peerId: session.peerId,
-            stream
-          }
-        } else {
-          return session
-        }
-      })
-      console.log(store)
+      // store.sessions[stream.peerId] = stream
+      store.sessions.push(stream)
+      // console.log(store.sessions[stream.peerId])
     })
-  }
+  })
 
-  function sendMessage(msg: CastMessage, local: boolean = true) {
-    if (store.room) store.room.send(msg)
-    if (local) onCastMessage(msg)
-  }
+  store.peer.on('error', console.error)
 
   async function startCast() {
     if (!store.room) throw new Error('No room')
     try {
       if (!store.localStream) {
         store.localStream = await getCameraStream(true)
+        store.room.replaceStream(store.localStream)
+        const ms: any = new MediaStream(store.localStream.getVideoTracks())
+        ms.peerId = store.peer.id
+        // store.sessions[store.peer.id] =
+        store.sessions.push(ms)
       }
-
-      store.room.replaceStream(store.localStream)
-      store.sessions.push({
-        peerId: store.peer.id,
-        stream: store.localStream
-      })
 
       sendMessage({
         type: 'startCast',
@@ -150,43 +189,15 @@ export default function(skywayKey: string, localStream?: MediaStream) {
     }
   }
 
-  function onCastMessage(data: CastMessage) {
-    if (data.type === 'startCast') {
-      store.master = data.master
-    } else if (data.type === 'stopCast') {
-      store.master = undefined
-    } else if (data.type === 'sync') {
-      store.master = data.master
-      store.members = data.members
-    }
+  async function stopCast() {
+    sendMessage({
+      type: 'stopCast'
+    })
   }
-
-  const masterStream = computed(() => {
-    const master = store.sessions.find(
-      (session) => session.peerId === store.master
-    )
-
-    console.log('master')
-    console.log(store)
-
-    if (!master) return undefined
-    if (!master.stream) return undefined
-
-    // self cast is master, mute sounds
-    if (master.peerId === store.peer.id) {
-      return new MediaStream(master.stream.getVideoTracks())
-    }
-
-    console.log(master.stream)
-
-    return master.stream
-  })
 
   return {
     store,
-    masterStream,
-    setLocalStream,
     startCast,
-    joinRoom
+    stopCast
   }
 }
