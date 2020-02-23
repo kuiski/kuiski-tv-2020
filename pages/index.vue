@@ -7,7 +7,11 @@
       >
     </el-row>
     <el-row class="row">
-      <el-button type="warning" size="medium" class="btn"
+      <el-button
+        type="warning"
+        size="medium"
+        class="btn"
+        @click="() => alert('作成中だよ')"
         >ディレクター</el-button
       >
     </el-row>

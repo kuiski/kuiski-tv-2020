@@ -47,6 +47,7 @@
             </div>
           </div>
         </telop-container>
+
         <telop-container position="bottom">
           <div class="bottom-menu">
             <el-button type="text" icon="el-icon-video-camera"></el-button>
@@ -63,8 +64,13 @@
             ></el-button>
           </div>
         </telop-container>
+
         <telop-container v-if="streamStore.master" position="top-right">
           <side-telop tag="速報" message="くいすきーTV v2" />
+        </telop-container>
+
+        <telop-container v-if="streamStore.master" position="top-left">
+          <Clock />
         </telop-container>
       </template>
     </TV>
@@ -116,7 +122,7 @@ import {
   watch
 } from '@vue/composition-api'
 import TV from '~/components/TV.vue'
-import { TelopContainer, SideTelop } from '~/components/telops'
+import { TelopContainer, SideTelop, Clock } from '~/components/telops'
 import { useScreenSize } from '~/api/useScreenSize'
 import { useStream } from '~/api/useStream'
 
@@ -191,6 +197,7 @@ export default createComponent<ChannelProps>({
   components: {
     TelopContainer,
     SideTelop,
+    Clock,
     TV
   }
 })
